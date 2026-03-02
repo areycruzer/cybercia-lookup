@@ -1,6 +1,6 @@
-"""Maigret"""
+"""CyberCIA Lookup"""
 
-__title__ = 'Maigret'
+__title__ = 'CyberCIA Lookup'
 __package__ = 'maigret'
 __author__ = 'Soxoj'
 __author_email__ = 'soxoj@protonmail.com'

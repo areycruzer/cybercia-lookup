@@ -1,5 +1,6 @@
 """
-Maigret main module
+CyberCIA Lookup — main CLI module
+(Powered by Maigret engine)
 """
 
 import ast
@@ -122,9 +123,9 @@ def setup_arguments_parser(settings: Settings):
 
     parser = ArgumentParser(
         formatter_class=RawDescriptionHelpFormatter,
-        description=f"Maigret v{__version__}\n"
-        "Documentation: https://maigret.readthedocs.io/\n"
-        "All settings are also configurable through files, see docs.",
+        description=f"CyberCIA Lookup v{__version__} (Maigret engine)\n"
+        "Advanced OSINT username intelligence across thousands of platforms.\n"
+        "Web UI & REST API: run with --web 5000",
     )
     parser.add_argument(
         "username",
@@ -564,7 +565,7 @@ async def main():
             return
 
         query_notify.success(
-            f'Maigret sites database self-check started for {len(site_data)} sites...'
+            f'CyberCIA Lookup — database self-check started for {len(site_data)} sites...'
         )
         is_need_update = await self_check(
             db,
@@ -633,7 +634,7 @@ async def main():
         sys.exit(2)
 
     query_notify.warning(
-        f'Starting a search on top {len(site_data)} sites from the Maigret database...'
+        f'\n⬡ CyberCIA Lookup — scanning {len(site_data)} platforms...'
     )
     if not args.all_sites:
         query_notify.warning(
@@ -784,7 +785,7 @@ def run():
             loop = asyncio.get_event_loop()
             loop.run_until_complete(main())
     except KeyboardInterrupt:
-        print('Maigret is interrupted.')
+        print('\n⬡ CyberCIA Lookup interrupted.')
         sys.exit(1)
 
 

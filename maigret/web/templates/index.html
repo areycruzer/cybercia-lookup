@@ -1,383 +1,815 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
 
-{% block content %}
-<style>
-    .tag-cloud {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 15px;
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.05);
-        margin-bottom: 20px;
-    }
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberCIA Lookup — OSINT Intelligence</title>
+    <meta name="description"
+        content="CyberCIA Lookup — find usernames across thousands of platforms. All checks run in your browser.">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050d1a;
+            --surface: #0a1628;
+            --surface2: #0d1f38;
+            --border: #0e2a4a;
+            --cyan: #00d4ff;
+            --cyan-dim: rgba(0, 212, 255, .08);
+            --cyan-glow: rgba(0, 212, 255, .35);
+            --green: #00ff88;
+            --red: #ff4466;
+            --text: #c8e6f7;
+            --muted: #5a8aaa;
+            --radius: 8px;
+        }
 
-    .tag {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 15px;
-        background-color: #dc3545;
-        color: white;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.3s ease;
-        user-select: none;
-    }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    .tag.selected {
-        background-color: #28a745;
-    }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background-image: radial-gradient(ellipse at top, rgba(0, 60, 120, .28) 0%, transparent 60%);
+        }
 
-    .tag:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, .02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, .02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
 
-    .hidden-select {
-        display: none !important;
-    }
+        /* ── HEADER ── */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(5, 13, 26, .96);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+            padding: .7rem 0;
+        }
 
-    .site-input-container {
-        position: relative;
-    }
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
 
-    .site-input {
-        width: 100%;
-    }
+        .hdr {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
 
-    .selected-sites {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 10px 0;
-    }
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            cursor: pointer;
+        }
 
-    .selected-site {
-        background-color: #214e7b;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 14px;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-    }
+        .logo-wrap img {
+            height: 38px;
+            filter: drop-shadow(0 0 8px var(--cyan-glow));
+        }
 
-    .remove-site {
-        cursor: pointer;
-        color: #dc3545;
-        font-weight: bold;
-    }
+        .brand {
+            font-family: 'Orbitron', monospace;
+            font-weight: 900;
+            font-size: 1.05rem;
+            color: var(--cyan);
+            text-shadow: 0 0 18px var(--cyan-glow);
+        }
 
-    .section-header {
-        cursor: pointer;
-        padding: 1rem;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 4px;
-        margin-bottom: 0.5rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+        .brand-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .56rem;
+            color: var(--muted);
+            letter-spacing: .25em;
+            text-transform: uppercase;
+            display: block;
+        }
 
-    .section-content {
-        padding: 1rem;
-        display: none;
-    }
+        .nav-link {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .78rem;
+            color: var(--muted);
+            text-decoration: none;
+            padding: .28rem .8rem;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            transition: all .2s;
+        }
 
-    .section-content.show {
-        display: block;
-    }
+        .nav-link:hover,
+        .nav-link.active {
+            color: var(--cyan);
+            border-color: var(--border);
+            background: var(--cyan-dim);
+        }
 
-    .chevron::after {
-        content: '▼';
-        transition: transform 0.2s;
-    }
+        /* ── MAIN LAYOUT ── */
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 4rem;
+            position: relative;
+            z-index: 1;
+        }
 
-    .chevron.collapsed::after {
-        transform: rotate(-90deg);
-    }
+        /* ── PANELS ── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
 
-    .main-search-section {
-        background: rgba(255, 255, 255, 0.03);
-        padding: 2rem;
-        border-radius: 8px;
-        margin-bottom: 2rem;
-    }
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+        }
 
-    .search-button {
-        width: 100%;
-        padding: 1rem;
-        font-size: 1.2rem;
-        margin-top: 2rem;
-    }
-</style>
+        .panel-title {
+            font-family: 'Orbitron', monospace;
+            font-size: .8rem;
+            font-weight: 700;
+            letter-spacing: .12em;
+            color: var(--cyan);
+            margin-bottom: 1.1rem;
+        }
 
-<div class="form-container">
-    {% if error %}
-    <div class="alert alert-danger">{{ error }}</div>
-    {% endif %}
+        /* ── INPUT FORM ── */
+        .search-hero {
+            text-align: center;
+            padding: 2rem 0 1.5rem;
+        }
 
-    <form method="POST" action="{{ url_for('search') }}" class="mb-4">
-        <!-- Main Search Section -->
-        <div class="main-search-section">
-            <div class="mb-4">
-                <label for="usernames" class="form-label h5">Usernames to Search</label>
-                <textarea class="form-control" id="usernames" name="usernames" rows="3" required
-                    placeholder="Enter one or more usernames (separated by spaces or commas)..."></textarea>
+        .search-hero h1 {
+            font-family: 'Orbitron', monospace;
+            font-weight: 900;
+            font-size: clamp(1.4rem, 4vw, 2.2rem);
+            color: var(--cyan);
+            text-shadow: 0 0 30px var(--cyan-glow);
+            letter-spacing: .08em;
+            margin-bottom: .4rem;
+        }
+
+        .search-hero p {
+            color: var(--muted);
+            font-size: .85rem;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: .08em;
+        }
+
+        .field-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .68rem;
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: .4rem;
+        }
+
+        .input-cyber {
+            width: 100%;
+            background: rgba(0, 212, 255, .04);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .9rem;
+            padding: .65rem 1rem;
+            outline: none;
+            transition: border-color .2s, box-shadow .2s;
+        }
+
+        .input-cyber:focus {
+            border-color: rgba(0, 212, 255, .5);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, .07);
+        }
+
+        .input-cyber::placeholder {
+            color: var(--muted);
+        }
+
+        .row2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        @media(max-width:540px) {
+            .row2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn-launch {
+            width: 100%;
+            margin-top: 1.25rem;
+            font-family: 'Orbitron', monospace;
+            font-size: .85rem;
+            font-weight: 700;
+            letter-spacing: .18em;
+            color: var(--bg);
+            background: linear-gradient(135deg, var(--cyan), #0a6bff);
+            border: none;
+            border-radius: 5px;
+            padding: .85rem 2rem;
+            cursor: pointer;
+            transition: all .25s;
+            box-shadow: 0 0 20px rgba(0, 212, 255, .25);
+        }
+
+        .btn-launch:hover:not(:disabled) {
+            box-shadow: 0 0 35px rgba(0, 212, 255, .5);
+            transform: translateY(-1px);
+        }
+
+        .btn-launch:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── SCAN VIEW (hidden by default) ── */
+        #scanView {
+            display: none;
+        }
+
+        .progress-track {
+            height: 7px;
+            background: rgba(0, 212, 255, .07);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: .55rem;
+            border: 1px solid rgba(0, 212, 255, .1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #0a6bff, var(--cyan));
+            transition: width .35s ease;
+            box-shadow: 0 0 10px rgba(0, 212, 255, .55);
+        }
+
+        .scan-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            color: var(--muted);
+            margin-bottom: 1.1rem;
+        }
+
+        .pct {
+            color: var(--cyan);
+            font-weight: 700;
+            font-size: .9rem;
+        }
+
+        /* found counter pill */
+        .found-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            background: rgba(0, 255, 136, .08);
+            border: 1px solid rgba(0, 255, 136, .2);
+            color: #00ff88;
+            border-radius: 30px;
+            padding: .2rem .75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem;
+            margin-bottom: 1rem;
+        }
+
+        .found-pill .count {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        /* result cards grid */
+        #resultGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: .65rem;
+        }
+
+        .result-card {
+            background: var(--surface2);
+            border: 1px solid rgba(0, 255, 136, .15);
+            border-radius: 6px;
+            padding: .7rem 1rem;
+            animation: slideIn .25s ease;
+            display: flex;
+            flex-direction: column;
+            gap: .25rem;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .rc-site {
+            font-size: .8rem;
+            font-weight: 600;
+            color: var(--green);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .rc-url {
+            font-size: .7rem;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rc-url a {
+            color: var(--cyan);
+            text-decoration: none;
+        }
+
+        .rc-url a:hover {
+            text-decoration: underline;
+        }
+
+        .rc-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 2px;
+        }
+
+        .rc-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .58rem;
+            letter-spacing: .05em;
+            background: var(--cyan-dim);
+            border: 1px solid rgba(0, 212, 255, .15);
+            color: var(--muted);
+            padding: 1px 6px;
+            border-radius: 3px;
+        }
+
+        /* empty / done states */
+        .scan-msg {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem;
+            color: var(--muted);
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        /* export bar */
+        .export-bar {
+            display: none;
+            gap: .7rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+            align-items: center;
+        }
+
+        .export-bar.show {
+            display: flex;
+        }
+
+        .btn-export {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem;
+            letter-spacing: .08em;
+            background: var(--cyan-dim);
+            border: 1px solid rgba(0, 212, 255, .25);
+            color: var(--cyan);
+            border-radius: 4px;
+            padding: .35rem .9rem;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .btn-export:hover {
+            background: rgba(0, 212, 255, .15);
+            border-color: var(--cyan);
+        }
+
+        /* ── FOOTER ── */
+        footer {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .65rem;
+            color: var(--muted);
+            letter-spacing: .1em;
+        }
+
+        /* ── NOTICE BANNER ── */
+        .notice {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            font-size: .8rem;
+            color: var(--muted);
+            background: var(--cyan-dim);
+            border: 1px solid rgba(0, 212, 255, .12);
+            border-radius: 6px;
+            padding: .65rem 1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .notice span {
+            color: var(--cyan);
+        }
+
+        /* scrollbar */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="hdr">
+            <div class="logo-wrap" onclick="resetSearch()">
+                <img src="/static/cybercia.png" alt="CyberCIA">
+                <div>
+                    <div class="brand">CyberCIA</div>
+                    <span class="brand-sub">Intelligence Lookup</span>
+                </div>
+            </div>
+            <nav style="display:flex;gap:.6rem;align-items:center;">
+                <a href="/" class="nav-link active">[ Search ]</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- ─── SEARCH FORM VIEW ─── -->
+        <div id="formView">
+            <div class="search-hero">
+                <h1>⬡ INTELLIGENCE LOOKUP</h1>
+                <p>All checks run directly in your browser — zero server load</p>
             </div>
 
-            <div class="row align-items-center">
-                <div class="col-md-6">
-                    <label for="top_sites" class="form-label">Number of Sites</label>
-                    <input type="number" class="form-control" id="top_sites" name="top_sites" min="1" max="10000"
-                        placeholder="Default: 500">
+            <div class="notice">
+                <span>⬡</span>
+                <div>Client-side mode active — your browser connects directly to each platform using a local proxy.
                 </div>
-                <div class="col-md-6">
-                    <label for="timeout" class="form-label">Timeout (seconds)</label>
-                    <input type="number" class="form-control" id="timeout" name="timeout" min="1"
-                        placeholder="Default: 30">
-                </div>
-                <div class="col-12 mt-3">
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" id="all_sites" name="all_sites"
-                            onchange="document.getElementById('top_sites').disabled = this.checked;">
-                        <label class="form-check-label" for="all_sites">Search All Sites</label>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">⬡ Target Configuration</div>
+
+                <div class="field-label">TARGET USERNAME(S)</div>
+                <input id="usernameInput" class="input-cyber" type="text"
+                    placeholder="Enter username(s) separated by spaces or commas..." autocomplete="off"
+                    autocorrect="off" autocapitalize="off" spellcheck="false">
+
+                <div class="row2">
+                    <div>
+                        <div class="field-label" style="margin-top:.9rem;">SITE SCAN LIMIT</div>
+                        <input id="limitInput" class="input-cyber" type="number" value="500" min="1" max="5000"
+                            placeholder="Default: 500">
+                    </div>
+                    <div>
+                        <div class="field-label" style="margin-top:.9rem;">CONCURRENCY (parallel checks)</div>
+                        <input id="concurInput" class="input-cyber" type="number" value="20" min="1" max="60"
+                            placeholder="Default: 20">
                     </div>
                 </div>
+
+                <button class="btn-launch" id="launchBtn" onclick="startClientSearch()">
+                    ⬡ &nbsp; LAUNCH INTELLIGENCE LOOKUP
+                </button>
             </div>
         </div>
 
-        <!-- Filters Section -->
-        <div class="mb-4">
-            <div class="section-header" onclick="toggleSection('filters')">
-                <h5 class="mb-0">Filters</h5>
-                <span class="chevron"></span>
-            </div>
-            <div id="filters" class="section-content">
-                <div class="mb-3 site-input-container">
-                    <label for="site" class="form-label">Specify Sites (Optional)</label>
-                    <input type="text" class="form-control site-input" id="siteInput"
-                        placeholder="Type to search for sites..." list="siteOptions">
-                    <input type="hidden" id="site" name="site">
-                    <datalist id="siteOptions">
-                        {% for site in site_options %}
-                        <option value="{{ site }}">
-                            {% endfor %}
-                    </datalist>
-                    <div class="selected-sites" id="selectedSites"></div>
-                </div>
+        <!-- ─── SCAN / RESULTS VIEW ─── -->
+        <div id="scanView">
 
-                <div class="mb-3">
-                    <label class="form-label">Tags (click to select)</label>
-                    <div class="tag-cloud" id="tagCloud"></div>
-                    <select multiple class="hidden-select" id="tags" name="tags">
-                        <option value="gaming">Gaming</option>
-                        <option value="coding">Coding</option>
-                        <option value="photo">Photo</option>
-                        <option value="music">Music</option>
-                        <option value="blog">Blog</option>
-                        <option value="finance">Finance</option>
-                        <option value="freelance">Freelance</option>
-                        <option value="dating">Dating</option>
-                        <option value="tech">Tech</option>
-                        <option value="forum">Forum</option>
-                        <option value="porn">Porn</option>
-                        <option value="erotic">Erotic</option>
-                        <option value="webcam">Webcam</option>
-                        <option value="video">Video</option>
-                        <option value="movies">Movies</option>
-                        <option value="hacking">Hacking</option>
-                        <option value="art">Art</option>
-                        <option value="discussion">Discussion</option>
-                        <option value="sharing">Sharing</option>
-                        <option value="writing">Writing</option>
-                        <option value="wiki">Wiki</option>
-                        <option value="business">Business</option>
-                        <option value="shopping">Shopping</option>
-                        <option value="sport">Sport</option>
-                        <option value="books">Books</option>
-                        <option value="news">News</option>
-                        <option value="documents">Documents</option>
-                        <option value="travel">Travel</option>
-                        <option value="maps">Maps</option>
-                        <option value="hobby">Hobby</option>
-                        <option value="apps">Apps</option>
-                        <option value="classified">Classified</option>
-                        <option value="career">Career</option>
-                        <option value="geosocial">Geosocial</option>
-                        <option value="streaming">Streaming</option>
-                        <option value="education">Education</option>
-                        <option value="networking">Networking</option>
-                        <option value="torrent">Torrent</option>
-                        <option value="science">Science</option>
-                        <option value="medicine">Medicine</option>
-                        <option value="reading">Reading</option>
-                        <option value="stock">Stock</option>
-                        <option value="messaging">Messaging</option>
-                        <option value="trading">Trading</option>
-                        <option value="links">Links</option>
-                        <option value="fashion">Fashion</option>
-                        <option value="tasks">Tasks</option>
-                        <option value="military">Military</option>
-                        <option value="auto">Auto</option>
-                        <option value="gambling">Gambling</option>
-                        <option value="cybercriminal">Cybercriminal</option>
-                        <option value="review">Review</option>
-                        <option value="bookmarks">Bookmarks</option>
-                        <option value="design">Design</option>
-                        <option value="tor">Tor</option>
-                        <option value="i2p">I2P</option>
-                        <option value="q&a">Q&A</option>
-                        <option value="crypto">Crypto</option>
-                        <option value="ai">AI</option>
-                    </select>
+            <!-- progress panel -->
+            <div class="panel" id="progressPanel">
+                <div class="panel-title" id="scanTitle">⬡ SCANNING TARGET</div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="scan-stats">
+                    <span id="scanText">Initialising...</span>
+                    <span class="pct" id="scanPct">0%</span>
+                </div>
+                <div class="found-pill">
+                    <span>⬡</span>
+                    <span class="count" id="foundCount">0</span>
+                    <span>profiles found</span>
+                </div>
+                <!-- export buttons (shown after done) -->
+                <div class="export-bar" id="exportBar">
+                    <span
+                        style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);">Export:</span>
+                    <button class="btn-export" onclick="exportJSON()">[ JSON ]</button>
+                    <button class="btn-export" onclick="exportCSV()">[ CSV ]</button>
+                    <button class="btn-export" onclick="resetSearch()">[ New Search ]</button>
                 </div>
             </div>
+
+            <!-- results grid -->
+            <div class="panel">
+                <div class="panel-title">⬡ Claimed Profiles</div>
+                <div id="emptyMsg" class="scan-msg">Scanning... results will appear here in real time</div>
+                <div id="resultGrid"></div>
+            </div>
+
         </div>
 
-        <!-- Advanced Options Section -->
-        <div class="mb-4">
-            <div class="section-header" onclick="toggleSection('advanced')">
-                <h5 class="mb-0">Advanced Options</h5>
-                <span class="chevron"></span>
-            </div>
-            <div id="advanced" class="section-content">
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="permute" name="permute">
-                    <label class="form-check-label" for="permute">Enable Username Permutations</label>
-                </div>
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="disable_recursive_search"
-                        name="disable_recursive_search">
-                    <label class="form-check-label" for="disable_recursive_search">Disable Recursive Search</label>
-                </div>
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="disable_extracting" name="disable_extracting">
-                    <label class="form-check-label" for="disable_extracting">Disable Information Extraction</label>
-                </div>
-                <div class="mb-3 form-check">
-                    <input type="checkbox" class="form-check-input" id="with_domains" name="with_domains">
-                    <label class="form-check-label" for="with_domains">Check Domains</label>
-                </div>
-                <div class="mb-3">
-                    <label for="proxy" class="form-label">Proxy URL</label>
-                    <input type="text" class="form-control" id="proxy" name="proxy"
-                        placeholder="e.g., 127.0.0.1:1080">
-                </div>
-                <div class="mb-3">
-                    <label for="tor_proxy" class="form-label">TOR Proxy URL</label>
-                    <input type="text" class="form-control" id="tor_proxy" name="tor_proxy"
-                        placeholder="Default: 127.0.0.1:9050">
-                </div>
-                <div class="mb-3">
-                    <label for="i2p_proxy" class="form-label">I2P Proxy URL</label>
-                    <input type="text" class="form-control" id="i2p_proxy" name="i2p_proxy"
-                        placeholder="Default: 127.0.0.1:4444">
-                </div>
-            </div>
-        </div>
+    </main>
 
-        <button type="submit" class="btn search-button" style="background-color: rgb(249, 207, 0); color: black;">
-            Start Search
-        </button>
-    </form>
-</div>
+    <footer>
+        ⬡ CyberCIA LOOKUP &nbsp;|&nbsp; OSINT Intelligence Platform
+    </footer>
 
-<script>
-    function toggleSection(sectionId) {
-        const content = document.getElementById(sectionId);
-        const header = content.previousElementSibling;
-        content.classList.toggle('show');
-        header.querySelector('.chevron').classList.toggle('collapsed');
-    }
+    <script>
+        // ─────────────────────────────────────────────
+        // State
+        // ─────────────────────────────────────────────
+        let claimedResults = [];
+        let scanRunning = false;
+        let abortFlag = false;
 
-    document.addEventListener('DOMContentLoaded', function () {
-        // Tag cloud functionality
-        const tagCloud = document.getElementById('tagCloud');
-        const hiddenSelect = document.getElementById('tags');
-        const allTags = Array.from(hiddenSelect.options).map(opt => ({
-            value: opt.value,
-            label: opt.text
-        }));
+        // ─────────────────────────────────────────────
+        // Start search
+        // ─────────────────────────────────────────────
+        async function startClientSearch() {
+            const rawInput = document.getElementById('usernameInput').value.trim();
+            if (!rawInput) { alert('Please enter at least one username.'); return; }
 
-        allTags.forEach(tag => {
-            const tagElement = document.createElement('span');
-            tagElement.className = 'tag';
-            tagElement.textContent = tag.label;
-            tagElement.dataset.value = tag.value;
+            const usernames = rawInput.split(/[\s,]+/).filter(Boolean);
+            const limit = Math.max(1, parseInt(document.getElementById('limitInput').value) || 500);
+            const concur = Math.max(1, Math.min(60, parseInt(document.getElementById('concurInput').value) || 20));
 
-            tagElement.addEventListener('click', function () {
-                const isSelected = this.classList.toggle('selected');
-                const option = Array.from(hiddenSelect.options).find(opt => opt.value === tag.value);
-                if (option) {
-                    option.selected = isSelected;
+            // Switch views
+            document.getElementById('formView').style.display = 'none';
+            document.getElementById('scanView').style.display = 'block';
+
+            claimedResults = [];
+            abortFlag = false;
+            scanRunning = true;
+
+            document.getElementById('resultGrid').innerHTML = '';
+            document.getElementById('emptyMsg').style.display = 'block';
+            document.getElementById('exportBar').classList.remove('show');
+            document.getElementById('foundCount').textContent = '0';
+            document.getElementById('scanTitle').textContent = `⬡ SCANNING — ${usernames.join(', ')}`;
+
+            // ── Load sites DB ──
+            setStatus('Loading sites database...', 0, 0, 0);
+            let sites;
+            try {
+                const r = await fetch(`/api/v1/db?limit=${limit}`);
+                const d = await r.json();
+                sites = d.sites;
+            } catch (e) {
+                setStatus('Failed to load sites database.', 0, 0, 0);
+                return;
+            }
+
+            const total = sites.length;
+            let checked = 0;
+
+            // ── check one username then the next ──
+            for (const username of usernames) {
+                if (abortFlag) break;
+                await checkUsername(username, sites, concur,
+                    (site, url, tags) => {
+                        // on claim
+                        addCard(site, url, tags);
+                    },
+                    (done) => {
+                        // on progress tick
+                        checked++;
+                        const pct = Math.round((checked / total) * 100);
+                        setStatus(`Checked ${checked.toLocaleString()} of ${total.toLocaleString()} platforms`, pct, total, done ? total : checked);
+                    }
+                );
+            }
+
+            // DONE
+            scanRunning = false;
+            const n = claimedResults.length;
+            document.getElementById('scanPct').textContent = '100%';
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('scanText').textContent = `Scan complete — ${n} profile(s) found across ${total} platforms`;
+            document.getElementById('exportBar').classList.add('show');
+            if (n === 0) {
+                document.getElementById('emptyMsg').textContent = 'No claimed profiles found for this username.';
+            }
+        }
+
+        // ─────────────────────────────────────────────
+        // Check one username against the site list
+        // ─────────────────────────────────────────────
+        async function checkUsername(username, sites, concur, onClaim, onTick) {
+            // Batch processing with a concurrency pool
+            let idx = 0;
+
+            async function worker() {
+                while (idx < sites.length && !abortFlag) {
+                    const site = sites[idx++];
+                    if (!site.url) { onTick(false); continue; }
+
+                    const profileUrl = site.url.replace('{username}', encodeURIComponent(username));
+
+                    try {
+                        const proxyUrl = '/api/v1/proxy?url=' + encodeURIComponent(profileUrl);
+                        const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+                        const data = await resp.json();
+
+                        const claimed = isClaimedResult(data, site);
+                        if (claimed) {
+                            onClaim(site.name, profileUrl, site.tags || []);
+                            claimedResults.push({ site: site.name, url: profileUrl, tags: site.tags || [] });
+                        }
+                    } catch (_) {
+                        // timeout or error — skip
+                    }
+                    onTick(false);
                 }
-            });
-
-            tagCloud.appendChild(tagElement);
-        });
-
-        // Site selection functionality
-        const siteInput = document.getElementById('siteInput');
-        const hiddenInput = document.getElementById('site');
-        const selectedSitesContainer = document.getElementById('selectedSites');
-        let selectedSites = new Set();
-
-        function updateHiddenInput() {
-            hiddenInput.value = Array.from(selectedSites).join(',');
-        }
-
-        function addSite(site) {
-            if (site && !selectedSites.has(site)) {
-                selectedSites.add(site);
-                updateHiddenInput();
-                const siteElement = document.createElement('span');
-                siteElement.className = 'selected-site';
-                siteElement.innerHTML = `${site}<span class="remove-site" data-site="${site}">&times;</span>`;
-                selectedSitesContainer.appendChild(siteElement);
             }
+
+            // Spin up `concur` parallel workers
+            const workers = Array.from({ length: concur }, worker);
+            await Promise.all(workers);
         }
 
-        function removeSite(site) {
-            selectedSites.delete(site);
-            updateHiddenInput();
-            const siteElements = selectedSitesContainer.querySelectorAll('.selected-site');
-            siteElements.forEach(el => {
-                if (el.querySelector('.remove-site').dataset.site === site) {
-                    el.remove();
+        // ─────────────────────────────────────────────
+        // Determine claimed/not-claimed from proxy response
+        // ─────────────────────────────────────────────
+        function isClaimedResult(data, site) {
+            const status = data.status || 0;
+            const content = data.content || '';
+            const finalUrl = data.final_url || '';
+
+            if (status === 0) return false;   // unreachable
+
+            switch (site.check_type) {
+                case 'status_code':
+                    return status >= 200 && status < 300 && status !== 204;
+
+                case 'message': {
+                    if (status === 404) return false;
+                    // absence strings → user NOT found if any appear
+                    if (site.absence_strs && site.absence_strs.length) {
+                        for (const s of site.absence_strs) {
+                            if (content.includes(s)) return false;
+                        }
+                    }
+                    // presence strings → user found only if any appear (if defined)
+                    if (site.presense_strs && site.presense_strs.length) {
+                        for (const s of site.presense_strs) {
+                            if (content.includes(s)) return true;
+                        }
+                        return false;
+                    }
+                    return status >= 200 && status < 300;
                 }
-            });
+
+                case 'response_url':
+                    // If the final URL after redirects still contains the username it's claimed
+                    return finalUrl.toLowerCase().includes(site.url_main.toLowerCase()) && status < 400;
+
+                default:
+                    return status >= 200 && status < 300 && status !== 404;
+            }
         }
 
-        siteInput.addEventListener('change', function (e) {
-            const value = this.value.trim();
-            if (value) {
-                addSite(value);
-                this.value = '';
+        // ─────────────────────────────────────────────
+        // UI helpers
+        // ─────────────────────────────────────────────
+        function setStatus(text, pct) {
+            document.getElementById('scanText').textContent = text;
+            document.getElementById('scanPct').textContent = pct + '%';
+            document.getElementById('progressFill').style.width = pct + '%';
+        }
+
+        function addCard(site, url, tags) {
+            const count = parseInt(document.getElementById('foundCount').textContent || '0') + 1;
+            document.getElementById('foundCount').textContent = count;
+            document.getElementById('emptyMsg').style.display = 'none';
+
+            const grid = document.getElementById('resultGrid');
+            const card = document.createElement('div');
+            card.className = 'result-card';
+
+            const tagHtml = tags.slice(0, 5).map(t =>
+                `<span class="rc-tag">${escHtml(t)}</span>`
+            ).join('');
+
+            card.innerHTML = `
+    <div class="rc-site">${escHtml(site)}</div>
+    <div class="rc-url"><a href="${escHtml(url)}" target="_blank" rel="noopener">${escHtml(url)}</a></div>
+    ${tags.length ? '<div class="rc-tags">' + tagHtml + '</div>' : ''}
+  `;
+            grid.appendChild(card);
+        }
+
+        function escHtml(str) {
+            return String(str).replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // ─────────────────────────────────────────────
+        // Reset to form view
+        // ─────────────────────────────────────────────
+        function resetSearch() {
+            abortFlag = true;
+            scanRunning = false;
+            document.getElementById('scanView').style.display = 'none';
+            document.getElementById('formView').style.display = 'block';
+            document.getElementById('usernameInput').value = '';
+        }
+
+        // ─────────────────────────────────────────────
+        // Exports
+        // ─────────────────────────────────────────────
+        function exportJSON() {
+            const blob = new Blob([JSON.stringify(claimedResults, null, 2)], { type: 'application/json' });
+            dlBlob(blob, 'cybercia_results.json');
+        }
+
+        function exportCSV() {
+            const lines = ['site,url,tags'];
+            for (const r of claimedResults) {
+                lines.push(`"${r.site}","${r.url}","${(r.tags || []).join(';')}"`);
             }
-        });
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+            dlBlob(blob, 'cybercia_results.csv');
+        }
 
-        selectedSitesContainer.addEventListener('click', function (e) {
-            if (e.target.classList.contains('remove-site')) {
-                removeSite(e.target.dataset.site);
-            }
-        });
+        function dlBlob(blob, filename) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
 
-        siteInput.addEventListener('paste', function (e) {
-            e.preventDefault();
-            const paste = (e.clipboardData || window.clipboardData).getData('text');
-            const sites = paste.split(',').map(site => site.trim()).filter(site => site);
-            sites.forEach(addSite);
-        });
-
-        const form = document.querySelector('form');
-        form.addEventListener('submit', function (e) {
-            const selectedTags = Array.from(tagCloud.querySelectorAll('.tag.selected'));
-            Array.from(hiddenSelect.options).forEach(opt => {
-                opt.selected = selectedTags.some(tag => tag.dataset.value === opt.value);
+        // Enter key support
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('usernameInput').addEventListener('keydown', e => {
+                if (e.key === 'Enter') startClientSearch();
             });
-            updateHiddenInput();
         });
-    });
-</script>
-{% endblock %}
+    </script>
+
+</body>
+
+</html>
